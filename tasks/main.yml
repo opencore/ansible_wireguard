@@ -1,0 +1,127 @@
+---
+
+# This is needed on CentOS/RHEL because otherwise the running kernel and the kernel-headers (installed as a dependency of wireguard)
+# might differ in version numbers and that causes the wireguard kernel module compilation to fail
+- name: Upgrade all packages so Kernel headers match
+  yum:
+    name: '*'
+    state: latest
+  notify: reboot
+
+- name: Flush handler if needed
+  meta: flush_handlers
+
+- name: Ensure WireGuard repo exists
+  get_url:
+    url: https://copr.fedorainfracloud.org/coprs/jdoss/wireguard/repo/epel-7/jdoss-wireguard-epel-7.repo
+    dest: /etc/yum.repos.d/wireguard.repo
+
+- name: Ensure EPEL Release is installed
+  yum:
+    name: epel-release
+    state: present
+
+- name: Ensure WireGuard is installed
+  package:
+    name:
+      - wireguard-dkms
+      - wireguard-tools
+    state: present
+
+- name: Ensure WireGuard kernel module is installed
+  modprobe:
+    name: wireguard
+    state: present
+  register: wireguard_module_enabled
+  until:  wireguard_module_enabled is succeeded
+  retries: 10
+  delay: 10
+  failed_when: wireguard_module_enabled is failure
+
+- name: Register whether private key already exists
+  stat:
+    path: "{{ wireguard_directory }}/private.key"
+  register: private_key_file_stat
+
+- name: Ensure WireGuard configuration directory exists
+  file:
+    dest: "{{ wireguard_directory }}"
+    state: directory
+    mode: 0700
+  when: private_key_file_stat.stat.exists == False
+
+- name: Generate WireGuard private key
+  shell: "wg genkey"
+  register: wg_private_key_result
+  when: private_key_file_stat.stat.exists == False
+
+- name: Set private key as fact
+  set_fact:
+      wg_private_key: "{{ wg_private_key_result.stdout }}"
+  when: private_key_file_stat.stat.exists == False
+
+- name: Store WireGuard private key in file
+  copy:
+    content: "{{ wg_private_key }}"
+    dest: "{{ wireguard_directory }}/private.key"
+    mode: "0600"
+  when: private_key_file_stat.stat.exists == False
+
+- name: Generate WireGuard public key
+  shell: "echo '{{ wg_private_key }}' | wg pubkey"
+  register: wg_public_key_result
+  when: private_key_file_stat.stat.exists == False
+
+- name: Set public key as fact
+  set_fact:
+    wg_public_key: "{{ wg_public_key_result.stdout }}"
+  when: private_key_file_stat.stat.exists == False
+
+- name: Store WireGuard public key in file
+  copy:
+    content: "{{ wg_public_key }}"
+    dest: "{{ wireguard_directory }}/public.key"
+    mode: "0600"
+  when: private_key_file_stat.stat.exists == False
+
+- name: Read public key
+  slurp:
+    src: "{{ wireguard_directory }}/public.key"
+  register: wg_public_key_result
+  when: private_key_file_stat.stat.exists == True
+
+- name: Set public key as fact
+  set_fact:
+    wg_public_key: "{{ wg_public_key_result.content | b64decode }}"
+  when: private_key_file_stat.stat.exists == True
+
+- name: Read private key
+  slurp:
+    src: "{{ wireguard_directory }}/private.key"
+  register: wg_private_key_result
+  when: private_key_file_stat.stat.exists == True
+
+- name: Set private key as fact
+  set_fact:
+    wg_private_key: "{{ wg_private_key_result.content | b64decode }}"
+  when: private_key_file_stat.stat.exists == True
+
+- name: Set VPN IP as fact
+  set_fact:
+    wg_ip_address: "{{ wireguard_network | ipmath(ansible_play_hosts_all.index(inventory_hostname)) }}"
+
+- name: Ensure WireGuard configuration file is up-to-date
+  template:
+    src: wg.conf.j2
+    dest: "{{wireguard_directory}}/{{wireguard_interface}}.conf"
+    owner: root
+    group: root
+    mode: 0600
+  notify:
+    - restart wireguard
+
+- name: Ensure WireGuard is started and enabled
+  service:
+    name: "wg-quick@{{wireguard_interface}}"
+    state: started
+    enabled: yes
