@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+
+{% for host in hostvars %}
+{{ hostvars[host].wg_ip_address }} {{ hostvars[host].ansible_nodename }} {{ hostvars[host].ansible_hostname }}
+{% endfor %}

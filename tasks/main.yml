@@ -125,3 +125,12 @@
     name: "wg-quick@{{ WG_INTERFACE }}"
     state: started
     enabled: yes
+
+- name: Ensure /etc/hosts is in place
+  template:
+    src: hosts.j2
+    dest: '/etc/hosts'
+    owner: root
+    group: root
+    mode: 0644
+  when: WG_UPDATE_HOSTS
