@@ -40,12 +40,12 @@
 
 - name: Register whether private key already exists
   stat:
-    path: "{{ wireguard_directory }}/private.key"
+    path: "{{ WG_CONFIG_DIRECTORY }}/private.key"
   register: private_key_file_stat
 
 - name: Ensure WireGuard configuration directory exists
   file:
-    dest: "{{ wireguard_directory }}"
+    dest: "{{ WG_CONFIG_DIRECTORY }}"
     state: directory
     mode: 0700
   when: private_key_file_stat.stat.exists == False
@@ -63,7 +63,7 @@
 - name: Store WireGuard private key in file
   copy:
     content: "{{ wg_private_key }}"
-    dest: "{{ wireguard_directory }}/private.key"
+    dest: "{{ WG_CONFIG_DIRECTORY }}/private.key"
     mode: "0600"
   when: private_key_file_stat.stat.exists == False
 
@@ -80,13 +80,13 @@
 - name: Store WireGuard public key in file
   copy:
     content: "{{ wg_public_key }}"
-    dest: "{{ wireguard_directory }}/public.key"
+    dest: "{{ WG_CONFIG_DIRECTORY }}/public.key"
     mode: "0600"
   when: private_key_file_stat.stat.exists == False
 
 - name: Read public key
   slurp:
-    src: "{{ wireguard_directory }}/public.key"
+    src: "{{ WG_CONFIG_DIRECTORY }}/public.key"
   register: wg_public_key_result
   when: private_key_file_stat.stat.exists == True
 
@@ -97,7 +97,7 @@
 
 - name: Read private key
   slurp:
-    src: "{{ wireguard_directory }}/private.key"
+    src: "{{ WG_CONFIG_DIRECTORY }}/private.key"
   register: wg_private_key_result
   when: private_key_file_stat.stat.exists == True
 
@@ -108,12 +108,12 @@
 
 - name: Set VPN IP as fact
   set_fact:
-    wg_ip_address: "{{ wireguard_network | ipmath(ansible_play_hosts_all.index(inventory_hostname)) }}"
+    wg_ip_address: "{{ WG_NETWORK | ipmath(ansible_play_hosts_all.index(inventory_hostname)) }}"
 
 - name: Ensure WireGuard configuration file is up-to-date
   template:
     src: wg.conf.j2
-    dest: "{{wireguard_directory}}/{{wireguard_interface}}.conf"
+    dest: "{{ WG_CONFIG_DIRECTORY }}/{{ WG_INTERFACE }}.conf"
     owner: root
     group: root
     mode: 0600
@@ -122,6 +122,6 @@
 
 - name: Ensure WireGuard is started and enabled
   service:
-    name: "wg-quick@{{wireguard_interface}}"
+    name: "wg-quick@{{ WG_INTERFACE }}"
     state: started
     enabled: yes

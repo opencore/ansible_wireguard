@@ -1,14 +1,14 @@
 [Interface]
-Address    = {{ wireguard_network | ipmath(ansible_play_hosts_all.index(inventory_hostname)) }}
+Address    = {{ WG_NETWORK | ipmath(ansible_play_hosts_all.index(inventory_hostname)) }}
 PrivateKey = {{ wg_private_key }}
-ListenPort = {{ wireguard_port }}
+ListenPort = {{ WG_PORT }}
 
 {% for host in ansible_play_hosts_all %}
 {%- if host != inventory_hostname %}
 [Peer]
 PublicKey = {{ hostvars[host].wg_public_key }}
 AllowedIPs = {{ hostvars[host].wg_ip_address }}
-Endpoint = {{host}}:{{wireguard_port}}
+Endpoint = {{ hostvars[host]['ansible_default_ipv4']['address'] }}:{{ WG_PORT }}
 PersistentKeepalive = 30
 
 {% endif %}

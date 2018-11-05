@@ -1,7 +1,7 @@
 ---
-wireguard_directory: /etc/wireguard
-wireguard_interface: wg0
-wireguard_port: 51820
+WG_CONFIG_DIRECTORY: /etc/wireguard
+WG_INTERFACE: wg0
+WG_PORT: 52888
 
 # This is the address for the _first_ host
-wireguard_network: 10.0.0.1
+WG_NETWORK: 10.0.0.1
